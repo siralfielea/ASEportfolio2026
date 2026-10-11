@@ -2,6 +2,7 @@
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
+using System.Numerics;
 
 namespace StarChart;
 
@@ -66,6 +67,7 @@ class Program
         _window.Run();
     }
 
+    private static StarCatalog _catalog = new();
     private static void OnLoad()
     {
         _gl = _window.CreateOpenGL();
@@ -89,15 +91,25 @@ class Program
         _gl.DeleteShader(vertexShader);
         _gl.DeleteShader(fragmentShader);
 
-        // 2. Temporary Normalized Device Coordinates (NDC) test stars (-1.0 to 1.0)
-        float[] vertices = new float[]
+        // Load star dataset
+            string csvPath = Path.Combine(AppContext.BaseDirectory, "Assets", "testStars.csv");
+        _catalog = CsvStarLoader.LoadFromFile(csvPath);
+        Console.WriteLine($"Loaded {_catalog.Stars.Count} stars into catalog.");
+
+        // Pack 3D position (x, y, z) and RGB color (r, g, b) per vertex into a float array
+        float[] vertexData = new float[_catalog.Stars.Count * 6];
+        for (int i = 0; i < _catalog.Stars.Count; i++)
         {
-             0.0f,  0.0f, 0.0f, // Center star
-            -0.5f,  0.4f, 0.0f, // Top-left
-             0.6f, -0.3f, 0.0f, // Bottom-right
-            -0.2f, -0.6f, 0.0f, // Bottom-left
-             0.4f,  0.5f, 0.0f  // Top-right
-        };
+            var star = _catalog.Stars[i];
+            Vector3 color = star.GetRGBColor();
+
+            vertexData[i * 6 + 0] = star.Position.X;
+            vertexData[i * 6 + 1] = star.Position.Y;
+            vertexData[i * 6 + 2] = star.Position.Z;
+            vertexData[i * 6 + 3] = color.X;
+            vertexData[i * 6 + 4] = color.Y;
+            vertexData[i * 6 + 5] = color.Z;
+        }
 
         // 3. Generate and bind buffers
         _vao = _gl.GenVertexArray();
@@ -105,7 +117,7 @@ class Program
 
         _gl.BindVertexArray(_vao);
 
-        _gl.BufferData(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)vertices, BufferUsageARB.StaticDraw);
+        _gl.BufferData(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)vertexData, BufferUsageARB.StaticDraw);
 
 
         // Configure position attribute at location 0
