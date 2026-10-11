@@ -13,7 +13,6 @@ public class StarRenderer : IDisposable
     private uint _vbo;
     private uint _starCount;
 
-    // Shader with perspective distance attenuation and magnitude scaling
     private const string VertexShaderSource = @"
         #version 330 core
         layout (location = 0) in vec3 aPosition;
@@ -29,20 +28,18 @@ public class StarRenderer : IDisposable
         {
             vColor = aColor;
 
-            // Transform into View Space to measure distance to camera
             vec4 viewPos = uView * vec4(aPosition, 1.0);
             gl_Position = uProjection * viewPos;
 
             float dist = length(viewPos.xyz);
 
-            // Brighter stars (lower/negative magnitude) render larger
-            float magScale = max(0.5, 3.5 - (aMagnitude * 0.25));
+            // Scale factor based on visual magnitude
+            float magScale = max(0.4, 4.0 - (aMagnitude * 0.3));
 
-            // Perspective point size formula: grows as distance decreases
-            float dynamicSize = (25.0 * magScale) / max(dist, 0.05);
+            // Power-curve distance attenuation prevents distant background stars from completely disappearing
+            float dynamicSize = (35.0 * magScale) / max(pow(dist, 0.65), 0.1);
 
-            // Clamp point size between 3px (far away) and 160px (up close)
-            gl_PointSize = clamp(dynamicSize, 3.0, 160.0);
+            gl_PointSize = clamp(dynamicSize, 2.5, 180.0);
         }
     ";
 
@@ -60,7 +57,6 @@ public class StarRenderer : IDisposable
                 discard;
             }
 
-            // Radial soft glow falloff
             float alpha = 1.0 - smoothstep(0.15, 1.0, dist);
             FragColor = vec4(vColor, alpha);
         }
@@ -77,7 +73,7 @@ public class StarRenderer : IDisposable
         _starCount = (uint)catalog.Stars.Count;
         if (_starCount == 0) return;
 
-        // Pack 7 floats per star: [X, Y, Z, R, G, B, Magnitude]
+        // 7 floats per star: [X, Y, Z, R, G, B, Magnitude]
         float[] vertexData = new float[_starCount * 7];
         for (int i = 0; i < catalog.Stars.Count; i++)
         {
@@ -102,17 +98,14 @@ public class StarRenderer : IDisposable
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         _gl.BufferData(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)vertexData, BufferUsageARB.StaticDraw);
 
-        uint stride = 7 * sizeof(float); // 7 floats stride
+        uint stride = 7 * sizeof(float);
 
-        // Location 0: Position (3 floats)
         _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, stride, 0);
         _gl.EnableVertexAttribArray(0);
 
-        // Location 1: Color (3 floats)
         _gl.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, stride, 3 * sizeof(float));
         _gl.EnableVertexAttribArray(1);
 
-        // Location 2: Magnitude (1 float)
         _gl.VertexAttribPointer(2, 1, VertexAttribPointerType.Float, false, stride, 6 * sizeof(float));
         _gl.EnableVertexAttribArray(2);
 

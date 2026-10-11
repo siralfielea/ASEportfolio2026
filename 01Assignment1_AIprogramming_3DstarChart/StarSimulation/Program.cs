@@ -45,39 +45,39 @@ class Program
         _window.Run();
     }
 
-    private static void OnLoad()
+private static void OnLoad()
+{
+    _gl = _window.CreateOpenGL();
+    _inputContext = _window.CreateInput();
+
+    _gl.Enable(EnableCap.ProgramPointSize);
+    _gl.Enable(EnableCap.Blend);
+    _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+    _camera.AspectRatio = (float)_window.Size.X / _window.Size.Y;
+
+    // Load full HYG catalog and sort brightest/named stars to top
+    string csvPath = Path.Combine(AppContext.BaseDirectory, "Assets", "hygdata_v42.csv.gz");
+    _catalog = CsvStarLoader.LoadFromFile(csvPath);
+    _catalog.SortNamedAndBrightestFirst();
+
+    _renderer = new StarRenderer(_gl);
+    _renderer.LoadCatalog(_catalog);
+
+    _uiManager = new UIManager(_gl, _window, _inputContext);
+    _uiManager.OnFlyToRequested += star =>
     {
-        _gl = _window.CreateOpenGL();
-        _inputContext = _window.CreateInput();
+        _camera.FlyTo(star.Position);
+    };
 
-        _gl.Enable(EnableCap.ProgramPointSize);
-        _gl.Enable(EnableCap.Blend);
-        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-
-        _camera.AspectRatio = (float)_window.Size.X / _window.Size.Y;
-
-        string csvPath = Path.Combine(AppContext.BaseDirectory, "Assets", "testStars.csv");
-        _catalog = CsvStarLoader.LoadFromFile(csvPath);
-
-        _renderer = new StarRenderer(_gl);
-        _renderer.LoadCatalog(_catalog);
-
-        _uiManager = new UIManager(_gl, _window, _inputContext);
-        _uiManager.OnFlyToRequested += star =>
-        {
-            _camera.FlyTo(star.Position);
-        };
-
-        // Wire mouse input events
-        if (_inputContext.Mice.Count > 0)
-        {
-            var mouse = _inputContext.Mice[0];
-            mouse.MouseMove += OnMouseMove;
-            mouse.Scroll += OnMouseScroll;
-            mouse.Click += OnMouseClick; // <--- Wire Click Event
-        }
+    if (_inputContext.Mice.Count > 0)
+    {
+        var mouse = _inputContext.Mice[0];
+        mouse.MouseMove += OnMouseMove;
+        mouse.Scroll += OnMouseScroll;
+        mouse.Click += OnMouseClick;
     }
-
+}
     private static void OnMouseClick(IMouse mouse, MouseButton button, Vector2 position)
     {
         // Ignore clicks if ImGui is capturing input (e.g. clicking buttons on sidebar)

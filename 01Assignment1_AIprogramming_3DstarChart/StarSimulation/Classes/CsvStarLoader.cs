@@ -1,33 +1,52 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Numerics;
 
 namespace StarChart;
 
 public static class CsvStarLoader
 {
-    /// <summary>
-    /// Loads star records from a CSV file into a StarCatalog instance.
-    /// Expects CSV columns: id, name, ra, dec, dist, mag, ci (or x, y, z)
-    /// </summary>
     public static StarCatalog LoadFromFile(string filePath)
     {
         var catalog = new StarCatalog();
 
-        if (!File.Exists(filePath))
+        string fullPath = filePath;
+        if (!File.Exists(fullPath))
         {
-            throw new FileNotFoundException($"Star catalog file not found at: {filePath}");
+            string baseDir = AppContext.BaseDirectory;
+            string inBase = Path.Combine(baseDir, filePath);
+            string inAssets = Path.Combine(baseDir, "Assets", filePath);
+
+            if (File.Exists(inBase)) fullPath = inBase;
+            else if (File.Exists(inAssets)) fullPath = inAssets;
+            else throw new FileNotFoundException($"Star catalog file not found. Checked: '{filePath}', '{inBase}', and '{inAssets}'");
         }
 
-        using var reader = new StreamReader(filePath);
+        // Open file stream
+        using var fileStream = File.OpenRead(fullPath);
+
+        // Decompress GZip automatically if file ends in .gz
+        using Stream streamToRead = fullPath.EndsWith(".gz", StringComparison.OrdinalIgnoreCase)
+            ? new GZipStream(fileStream, CompressionMode.Decompress)
+            : fileStream;
+
+        using var reader = new StreamReader(streamToRead);
+
         string? headerLine = reader.ReadLine();
         if (headerLine == null) return catalog;
 
-        // Map column indices dynamically from CSV header
         var headers = headerLine.Split(',');
         int idxId = Array.FindIndex(headers, h => h.Trim().Equals("id", StringComparison.OrdinalIgnoreCase));
         int idxName = Array.FindIndex(headers, h => h.Trim().Equals("proper", StringComparison.OrdinalIgnoreCase) || h.Trim().Equals("name", StringComparison.OrdinalIgnoreCase));
+        
+        int idxBayer = Array.FindIndex(headers, h => h.Trim().Equals("bayer", StringComparison.OrdinalIgnoreCase));
+        int idxFlam  = Array.FindIndex(headers, h => h.Trim().Equals("flam", StringComparison.OrdinalIgnoreCase));
+        int idxCon   = Array.FindIndex(headers, h => h.Trim().Equals("con", StringComparison.OrdinalIgnoreCase));
+        int idxHd    = Array.FindIndex(headers, h => h.Trim().Equals("hd", StringComparison.OrdinalIgnoreCase));
+        int idxHip   = Array.FindIndex(headers, h => h.Trim().Equals("hip", StringComparison.OrdinalIgnoreCase));
+
         int idxX = Array.FindIndex(headers, h => h.Trim().Equals("x", StringComparison.OrdinalIgnoreCase));
         int idxY = Array.FindIndex(headers, h => h.Trim().Equals("y", StringComparison.OrdinalIgnoreCase));
         int idxZ = Array.FindIndex(headers, h => h.Trim().Equals("z", StringComparison.OrdinalIgnoreCase));
@@ -35,7 +54,7 @@ public static class CsvStarLoader
         int idxDec = Array.FindIndex(headers, h => h.Trim().Equals("dec", StringComparison.OrdinalIgnoreCase));
         int idxDist = Array.FindIndex(headers, h => h.Trim().Equals("dist", StringComparison.OrdinalIgnoreCase));
         int idxMag = Array.FindIndex(headers, h => h.Trim().Equals("mag", StringComparison.OrdinalIgnoreCase));
-        int idxCi = Array.FindIndex(headers, h => h.Trim().Equals("ci", StringComparison.OrdinalIgnoreCase)); // B-V Color Index
+        int idxCi = Array.FindIndex(headers, h => h.Trim().Equals("ci", StringComparison.OrdinalIgnoreCase));
         int idxTemp = Array.FindIndex(headers, h => h.Trim().Equals("temp", StringComparison.OrdinalIgnoreCase));
 
         int autoId = 1;
@@ -47,12 +66,33 @@ public static class CsvStarLoader
 
             string[] cols = line.Split(',');
 
-            // Parse ID and Name
-            int id = (idxId >= 0 && ParseFloat(cols[idxId], out float parsedId)) ? (int)parsedId : autoId++;
+            int id = (idxId >= 0 && idxId < cols.Length && ParseFloat(cols[idxId], out float parsedId)) ? (int)parsedId : autoId++;
             string? name = (idxName >= 0 && idxName < cols.Length) ? cols[idxName].Trim() : null;
-            if (string.IsNullOrWhiteSpace(name)) name = null;
 
-            // Resolve 3D Position (Parsecs / Light Years)
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                string bayer = (idxBayer >= 0 && idxBayer < cols.Length) ? cols[idxBayer].Trim() : "";
+                string flam  = (idxFlam  >= 0 && idxFlam  < cols.Length) ? cols[idxFlam].Trim()  : "";
+                string con   = (idxCon   >= 0 && idxCon   < cols.Length) ? cols[idxCon].Trim()   : "";
+
+                if (!string.IsNullOrEmpty(bayer) || !string.IsNullOrEmpty(flam))
+                {
+                    name = $"{flam} {bayer} {con}".Trim();
+                }
+                else if (idxHd >= 0 && idxHd < cols.Length && !string.IsNullOrWhiteSpace(cols[idxHd]))
+                {
+                    name = $"HD {cols[idxHd].Trim()}";
+                }
+                else if (idxHip >= 0 && idxHip < cols.Length && !string.IsNullOrWhiteSpace(cols[idxHip]))
+                {
+                    name = $"HIP {cols[idxHip].Trim()}";
+                }
+                else
+                {
+                    name = null;
+                }
+            }
+
             Vector3 position = Vector3.Zero;
             if (idxX >= 0 && idxY >= 0 && idxZ >= 0 &&
                 idxX < cols.Length && idxY < cols.Length && idxZ < cols.Length &&
@@ -71,22 +111,18 @@ public static class CsvStarLoader
                 position = ConvertSphericalToCartesian(raHours, decDeg, dist);
             }
 
-            // Parse Magnitude
             float mag = (idxMag >= 0 && idxMag < cols.Length && ParseFloat(cols[idxMag], out float m)) ? m : 5.0f;
 
-            // Resolve Temperature in Kelvin
-            float temp = 5778.0f; // Default Sol temperature
+            float temp = 5778.0f;
             if (idxTemp >= 0 && idxTemp < cols.Length && ParseFloat(cols[idxTemp], out float tKelvin))
             {
                 temp = tKelvin;
             }
             else if (idxCi >= 0 && idxCi < cols.Length && ParseFloat(cols[idxCi], out float ci))
             {
-                // Ballesteros formula: Temperature from B-V color index
                 temp = 4600.0f * (1.0f / (0.92f * ci + 1.7f) + 1.0f / (0.92f * ci + 0.62f));
             }
 
-            // Calculate approximate luminosity from magnitude (Sol = 1.0)
             float luminosity = MathF.Pow(10.0f, (4.83f - mag) / 2.5f);
 
             var star = new Star
@@ -105,12 +141,9 @@ public static class CsvStarLoader
         return catalog;
     }
 
-    /// <summary>
-    /// Converts RA (Hours 0-24), Dec (Degrees -90 to +90), and Distance into 3D Cartesian coordinates.
-    /// </summary>
     private static Vector3 ConvertSphericalToCartesian(float raHours, float decDegrees, float distance)
     {
-        float raRad = raHours * (15.0f * MathF.PI / 180.0f); // 1 hour = 15 degrees
+        float raRad = raHours * (15.0f * MathF.PI / 180.0f);
         float decRad = decDegrees * (MathF.PI / 180.0f);
 
         float x = distance * MathF.Cos(decRad) * MathF.Cos(raRad);
