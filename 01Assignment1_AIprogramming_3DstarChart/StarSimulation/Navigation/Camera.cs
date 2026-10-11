@@ -74,7 +74,7 @@ public class Camera
     public Matrix4x4 GetProjectionMatrix()
     {
         float fovRad = FovDegrees * (MathF.PI / 180.0f);
-        return Matrix4x4.CreatePerspectiveFieldOfView(fovRad, AspectRatio, 0.1f, 3000.0f);
+        return Matrix4x4.CreatePerspectiveFieldOfView(fovRad, AspectRatio, 0.01f, 3000.0f);
     }
 
     private void UpdateVectors()
