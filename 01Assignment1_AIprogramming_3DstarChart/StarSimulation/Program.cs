@@ -105,20 +105,11 @@ class Program
 
         _gl.BindVertexArray(_vao);
 
-        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-        unsafe
-        {
-            fixed (float* v = vertices)
-            {
-                _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(vertices.Length * sizeof(float)), v, BufferUsageARB.StaticDraw);
-            }
-        }
+        _gl.BufferData(BufferTargetARB.ArrayBuffer, (ReadOnlySpan<float>)vertices, BufferUsageARB.StaticDraw);
+
 
         // Configure position attribute at location 0
-        unsafe
-        {
-            _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), (void*)0);
-        }
+        _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
         _gl.EnableVertexAttribArray(0);
 
         _gl.BindBuffer(BufferTargetARB.ArrayBuffer, 0);
@@ -138,7 +129,7 @@ class Program
         _gl.DrawArrays(PrimitiveType.Points, 0, 5);
     }
 
-    private static unsafe uint CompileShader(ShaderType type, string source)
+    private static uint CompileShader(ShaderType type, string source)
     {
         uint shader = _gl.CreateShader(type);
         _gl.ShaderSource(shader, source);
@@ -148,12 +139,12 @@ class Program
         if (status == 0)
         {
             string infoLog = _gl.GetShaderInfoLog(shader);
+            _gl.DeleteShader(shader);
             throw new Exception($"Error compiling {type}: {infoLog}");
         }
 
         return shader;
     }
-
     private static void OnUpdate(double deltaTime) { }
 
     private static void OnClosing()
