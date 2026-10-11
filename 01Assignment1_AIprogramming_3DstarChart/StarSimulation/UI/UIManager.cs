@@ -12,6 +12,11 @@ namespace StarChart.UI;
 
 public class UIManager : IDisposable
 {
+    public void SelectStar(Star star)
+    {
+        SelectedStar = star;
+    }
+
     private readonly ImGuiController _imGuiController;
     public Star? SelectedStar { get; private set; }
 

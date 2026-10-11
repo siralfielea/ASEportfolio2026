@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
+using ImGuiNET;
 using Silk.NET.Input;
+using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
@@ -20,6 +22,8 @@ class Program
     private static StarRenderer _renderer = null!;
     private static Camera _camera = new();
     private static UIManager _uiManager = null!;
+
+    private static Vector2 _lastMousePos;
 
     static void Main(string[] args)
     {
@@ -63,6 +67,59 @@ class Program
         {
             _camera.FlyTo(star.Position);
         };
+
+        // Wire mouse input events
+        if (_inputContext.Mice.Count > 0)
+        {
+            var mouse = _inputContext.Mice[0];
+            mouse.MouseMove += OnMouseMove;
+            mouse.Scroll += OnMouseScroll;
+            mouse.Click += OnMouseClick; // <--- Wire Click Event
+        }
+    }
+
+    private static void OnMouseClick(IMouse mouse, MouseButton button, Vector2 position)
+    {
+        // Ignore clicks if ImGui is capturing input (e.g. clicking buttons on sidebar)
+        if (ImGui.GetIO().WantCaptureMouse) return;
+
+        if (button == MouseButton.Left)
+        {
+            Star? pickedStar = StarPicker.PickStar(position, _window.Size, _catalog, _camera);
+
+            if (pickedStar != null)
+            {
+                _uiManager.SelectStar(pickedStar);
+                Console.WriteLine($"Selected star: {pickedStar.DisplayName}");
+            }
+        }
+    }
+    private static void OnMouseMove(IMouse mouse, System.Numerics.Vector2 position)
+    {
+        Vector2 delta = new(position.X - _lastMousePos.X, position.Y - _lastMousePos.Y);
+        _lastMousePos = position;
+
+        // Skip viewport navigation if ImGui is capturing mouse input
+        if (ImGui.GetIO().WantCaptureMouse) return;
+
+        // Right Mouse Drag: Rotate camera (Yaw / Pitch)
+        if (mouse.IsButtonPressed(MouseButton.Right))
+        {
+            _camera.ProcessMouseRotation(delta.X, delta.Y);
+        }
+        // Middle Mouse Drag OR Shift + Right Drag: Pan camera (XY plane)
+        else if (mouse.IsButtonPressed(MouseButton.Middle) || 
+                (mouse.IsButtonPressed(MouseButton.Right) && _inputContext.Keyboards[0].IsKeyPressed(Key.ShiftLeft)))
+        {
+            _camera.ProcessMousePan(delta.X, delta.Y);
+        }
+    }
+
+    private static void OnMouseScroll(IMouse mouse, ScrollWheel scroll)
+    {
+        if (ImGui.GetIO().WantCaptureMouse) return;
+
+        _camera.ProcessMouseScroll(scroll.Y);
     }
 
     private static void OnUpdate(double deltaTime)
@@ -76,10 +133,7 @@ class Program
         _gl.ClearColor(0.01f, 0.01f, 0.03f, 1.0f);
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-        // 1. Render 3D Star Scene
         _renderer.Render(_camera);
-
-        // 2. Render ImGui Overlay
         _uiManager.Render(_catalog, _camera, _window.Size);
     }
 
