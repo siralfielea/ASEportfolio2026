@@ -14,6 +14,7 @@ public class UIManager : IDisposable
 {
     private readonly ImGuiController _imGuiController;
     private string _searchFilter = "";
+    private bool _properNamedOnly = true; // Enabled by default to hide raw ID numbers
 
     public Star? SelectedStar { get; private set; }
     public event Action<Star>? OnFlyToRequested;
@@ -77,7 +78,7 @@ public class UIManager : IDisposable
                 string selectText = $"{star.DisplayName} ({distToCamera:F1} ly)";
                 drawList.AddText(new Vector2(screenX + boxHalfSize + 5, screenY - 7), borderCol, selectText);
             }
-            else if (star.IsNamed)
+            else if (star.HasProperName)
             {
                 float maxVisibilityRange = 1200.0f;
                 float fadeStart = 150.0f;
@@ -86,7 +87,7 @@ public class UIManager : IDisposable
                 if (distToCamera < maxVisibilityRange && alpha > 0.05f)
                 {
                     uint textCol = ImGui.ColorConvertFloat4ToU32(new Vector4(0.85f, 0.92f, 1.0f, alpha * 0.85f));
-                    drawList.AddText(new Vector2(screenX + 8, screenY - 6), textCol, star.Name!);
+                    drawList.AddText(new Vector2(screenX + 8, screenY - 6), textCol, star.ProperName!);
                 }
             }
         }
@@ -101,6 +102,9 @@ public class UIManager : IDisposable
         {
             ImGui.Text($"Catalog Count: {catalog.Stars.Count}");
             ImGui.InputText("Search", ref _searchFilter, 64);
+            
+            // Toggle for proper named stars vs all stars
+            ImGui.Checkbox("Proper Named Only", ref _properNamedOnly);
             ImGui.Separator();
 
             if (ImGui.BeginChild("StarListScroll"))
@@ -110,6 +114,13 @@ public class UIManager : IDisposable
 
                 foreach (var star in catalog.Stars)
                 {
+                    // Filter 1: Proper Named Only toggle
+                    if (_properNamedOnly && !star.HasProperName) continue;
+
+                    // Filter 2: Hide raw Star #ID entries when proper named toggle is off
+                    if (!_properNamedOnly && !star.HasProperName && !star.HasDesignation) continue;
+
+                    // Filter 3: Search string match
                     if (!string.IsNullOrWhiteSpace(_searchFilter) &&
                         !star.DisplayName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase))
                     {

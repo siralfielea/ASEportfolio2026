@@ -19,8 +19,8 @@ public class StarCatalog
     {
         Stars.Sort((a, b) =>
         {
-            if (a.IsNamed && !b.IsNamed) return -1;
-            if (!a.IsNamed && b.IsNamed) return 1;
+            if (a.HasProperName && !b.HasProperName) return -1;
+            if (!a.HasProperName && b.HasProperName) return 1;
             return a.Magnitude.CompareTo(b.Magnitude);
         });
     }

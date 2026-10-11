@@ -1,56 +1,58 @@
+using System;
 using System.Numerics;
 
 namespace StarChart;
-public class Star {
-public int Id { get; set; }
-    public string? Name { get; set; } // Nullable: real stars have names, catalog stars might not
-    
-    // Spatial Position in 3D Space (e.g. in Light-Years or Parsecs from Sol at 0,0,0)
+
+public class Star
+{
+    public int Id { get; set; }
+    public string? ProperName { get; set; }
+    public string? Designation { get; set; }
     public Vector3 Position { get; set; }
+    public float Magnitude { get; set; }
+    public float Temperature { get; set; }
+    public float Luminosity { get; set; }
+
+    // Returns true ONLY if the star has an actual proper human name (e.g. Sirius, Betelgeuse, Sol)
+    public bool HasProperName => !string.IsNullOrWhiteSpace(ProperName);
     
-    // Physical & Astronomical Properties
-    public float Temperature { get; set; } // In Kelvin (e.g. 5778 K for Sun)
-    public float Luminosity { get; set; }  // Relative to Sun (Sol = 1.0)
-    public float Magnitude { get; set; }   // Apparent or Absolute magnitude
-    public float AbsoluteRadius { get; set; } // Relative to Sun radius
+    // Returns true if the star has a catalog designation (e.g. Bayer/Flamsteed, HD, HIP)
+    public bool HasDesignation => !string.IsNullOrWhiteSpace(Designation);
 
-    // Utility properties
-    public bool IsNamed => !string.IsNullOrWhiteSpace(Name);
-    public string DisplayName => IsNamed ? Name! : $"UNNAMED-{Id:D6}";
+    // Displays Proper Name if available, falls back to Designation (HD/HIP), then ID
+    public string DisplayName => HasProperName 
+        ? ProperName! 
+        : (HasDesignation ? Designation! : $"Star #{Id}");
 
-    /// <summary>
-    /// Calculates star color (RGB) based on surface temperature (Kelvin blackbody approximation).
-    /// Hot stars (>10,000K) are blue; Cool stars (<3,500K) are red; Mid-range (~5,800K) are yellow/white.
-    /// </summary>
     public Vector3 GetRGBColor()
     {
         float temp = Temperature / 100.0f;
-        float r, g, b;
+        float red, green, blue;
 
-        // Red channel
-        if (temp <= 66)
-            r = 255;
+        if (temp <= 66.0f)
+        {
+            red = 255.0f;
+            green = Math.Clamp(99.4708025861f * MathF.Log(temp) - 161.1195681661f, 0f, 255f);
+        }
         else
-            r = 329.698727446f * MathF.Pow(temp - 60, -0.1332047592f);
+        {
+            red = Math.Clamp(329.698727446f * MathF.Pow(temp - 60.0f, -0.1332047592f), 0f, 255f);
+            green = Math.Clamp(288.1221695283f * MathF.Pow(temp - 60.0f, -0.0755148492f), 0f, 255f);
+        }
 
-        // Green channel
-        if (temp <= 66)
-            g = 99.4708025861f * MathF.Log(temp) - 161.1195681661f;
+        if (temp >= 66.0f)
+        {
+            blue = 255.0f;
+        }
+        else if (temp <= 19.0f)
+        {
+            blue = 0.0f;
+        }
         else
-            g = 288.1221695283f * MathF.Pow(temp - 60, -0.0755148492f);
+        {
+            blue = Math.Clamp(138.5177312231f * MathF.Log(temp - 10.0f) - 305.0447927307f, 0f, 255f);
+        }
 
-        // Blue channel
-        if (temp >= 66)
-            b = 255;
-        else if (temp <= 19)
-            b = 0;
-        else
-            b = 138.5177312231f * MathF.Log(temp - 10) - 305.0447927307f;
-
-        return new Vector3(
-            Math.Clamp(r / 255.0f, 0.0f, 1.0f),
-            Math.Clamp(g / 255.0f, 0.0f, 1.0f),
-            Math.Clamp(b / 255.0f, 0.0f, 1.0f)
-        );
+        return new Vector3(red / 255.0f, green / 255.0f, blue / 255.0f);
     }
 }
