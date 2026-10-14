@@ -133,10 +133,9 @@ private static void OnLoad()
         _gl.ClearColor(0.01f, 0.01f, 0.03f, 1.0f);
         _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-        _renderer.Render(_camera);
+        _renderer.Render(_camera, _window.Size); // <--- Pass _window.Size here
         _uiManager.Render(_catalog, _camera, _window.Size);
     }
-
     private static void OnFramebufferResize(Vector2D<int> size)
     {
         _gl.Viewport(size);

@@ -29,6 +29,24 @@ public class Shader : IDisposable
 
     public void Use() => _gl.UseProgram(Handle);
 
+    public void SetFloat(string name, float value)
+    {
+        int location = _gl.GetUniformLocation(Handle, name);
+        if (location != -1)
+        {
+            _gl.Uniform1(location, value);
+        }
+    }
+
+    public void SetInt(string name, int value)
+    {
+        int location = _gl.GetUniformLocation(Handle, name);
+        if (location != -1)
+        {
+            _gl.Uniform1(location, value);
+        }
+    }
+
     public void SetMatrix4(string name, ref Matrix4x4 matrix)
     {
         int location = _gl.GetUniformLocation(Handle, name);
