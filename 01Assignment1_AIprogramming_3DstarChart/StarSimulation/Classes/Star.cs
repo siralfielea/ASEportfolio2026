@@ -13,16 +13,40 @@ public class Star
     public float Temperature { get; set; }
     public float Luminosity { get; set; }
 
-    // Returns true ONLY if the star has an actual proper human name (e.g. Sirius, Betelgeuse, Sol)
+    // Solar Diameter relative to the Sun (Sun = 1.0, Betelgeuse ≈ 1000.0)
+    public float SolarDiameter => GetSolarDiameter();
+
     public bool HasProperName => !string.IsNullOrWhiteSpace(ProperName);
-    
-    // Returns true if the star has a catalog designation (e.g. Bayer/Flamsteed, HD, HIP)
     public bool HasDesignation => !string.IsNullOrWhiteSpace(Designation);
 
-    // Displays Proper Name if available, falls back to Designation (HD/HIP), then ID
     public string DisplayName => HasProperName 
         ? ProperName! 
         : (HasDesignation ? Designation! : $"Star #{Id}");
+
+    /// <summary>
+    /// Calculates stellar diameter relative to the Sun (Sol = 1.0) using Stefan-Boltzmann ratio.
+    /// </summary>
+    public float GetSolarDiameter()
+    {
+        if (Temperature <= 0.0f) return 1.0f;
+
+        const float solarTemp = 5778.0f; // Sun surface temp in Kelvin
+        
+        // R / R_sun = sqrt(L / L_sun) * (T_sun / T)^2
+        float radiusRatio = MathF.Sqrt(Luminosity) * MathF.Pow(solarTemp / Temperature, 2.0f);
+
+        // Diameter Ratio = 2 * Radius Ratio (normalized to Sun = 1.0)
+        return radiusRatio;
+    }
+
+    /// <summary>
+    /// Returns absolute physical diameter in kilometers.
+    /// </summary>
+    public double GetDiameterKm()
+    {
+        const double solarDiameterKm = 1_392_700.0; // Sun diameter in km
+        return GetSolarDiameter() * solarDiameterKm;
+    }
 
     public Vector3 GetRGBColor()
     {

@@ -18,6 +18,7 @@ public class StarRenderer : IDisposable
         layout (location = 0) in vec3 aPosition;
         layout (location = 1) in vec3 aColor;
         layout (location = 2) in float aMagnitude;
+        layout (location = 3) in float aSolarDiameter;
 
         uniform mat4 uView;
         uniform mat4 uProjection;
@@ -33,13 +34,12 @@ public class StarRenderer : IDisposable
 
             float dist = length(viewPos.xyz);
 
-            // Scale factor based on visual magnitude
-            float magScale = max(0.4, 4.0 - (aMagnitude * 0.3));
-
-            // Power-curve distance attenuation prevents distant background stars from completely disappearing
-            float dynamicSize = (35.0 * magScale) / max(pow(dist, 0.65), 0.1);
-
-            gl_PointSize = clamp(dynamicSize, 2.5, 180.0);
+            // Scale physical diameter logarithmically or with a clamped factor so giant stars 
+            // (like Betelgeuse, ~1000x Sun) look impressively large without consuming the entire screen.
+            float sizeScale = log2(max(aSolarDiameter, 0.1) + 1.0);
+            
+            float dynamicSize = (40.0 * sizeScale) / max(pow(dist, 0.65), 0.1);
+            gl_PointSize = clamp(dynamicSize, 2.5, 250.0);
         }
     ";
 
@@ -73,8 +73,8 @@ public class StarRenderer : IDisposable
         _starCount = (uint)catalog.Stars.Count;
         if (_starCount == 0) return;
 
-        // 7 floats per star: [X, Y, Z, R, G, B, Magnitude]
-        float[] vertexData = new float[_starCount * 7];
+        // 8 floats per star: [X, Y, Z, R, G, B, Magnitude, SolarDiameter]
+        float[] vertexData = new float[_starCount * 8];
         for (int i = 0; i < catalog.Stars.Count; i++)
         {
             var star = catalog.Stars[i];

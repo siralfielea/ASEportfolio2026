@@ -173,6 +173,7 @@ public class UIManager : IDisposable
             ImGui.NextColumn();
 
             ImGui.Text($"Temp: {SelectedStar.Temperature:F0} K");
+            ImGui.Text($"Solar Dimameter: {SelectedStar.GetDiameterKm():F2} Km");
             ImGui.Text($"Mag:  {SelectedStar.Magnitude:F2}");
             ImGui.Text($"Lum:  {SelectedStar.Luminosity:F2} Sol");
 
