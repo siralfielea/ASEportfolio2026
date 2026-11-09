@@ -5,6 +5,9 @@ namespace StarChart.Navigation;
 
 public class Camera
 {
+    /// <summary>
+    /// Navigates the SarPicker.cs and interfaces movement.
+    /// </summary>
     public Vector3 Position { get; set; } = new(0f, 0f, 50f);
     public Vector3 TargetPosition { get; set; } = new(0f, 0f, 50f);
 

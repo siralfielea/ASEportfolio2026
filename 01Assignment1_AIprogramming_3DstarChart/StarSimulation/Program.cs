@@ -13,6 +13,9 @@ using StarChart.UI;
 namespace StarChart;
 
 class Program
+/// <sumary>
+/// The entry point to the Program
+/// </summary>
 {
     private static IWindow _window = null!;
     private static GL _gl = null!;
@@ -22,7 +25,6 @@ class Program
     private static StarRenderer _renderer = null!;
     private static Camera _camera = new();
     private static UIManager _uiManager = null!;
-
     private static Vector2 _lastMousePos;
 
     static void Main(string[] args)
@@ -45,39 +47,39 @@ class Program
         _window.Run();
     }
 
-private static void OnLoad()
-{
-    _gl = _window.CreateOpenGL();
-    _inputContext = _window.CreateInput();
-
-    _gl.Enable(EnableCap.ProgramPointSize);
-    _gl.Enable(EnableCap.Blend);
-    _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-
-    _camera.AspectRatio = (float)_window.Size.X / _window.Size.Y;
-
-    // Load full HYG catalog and sort brightest/named stars to top
-    string csvPath = Path.Combine(AppContext.BaseDirectory, "Assets", "hygdata_v42.csv.gz");
-    _catalog = CsvStarLoader.LoadFromFile(csvPath);
-    _catalog.SortNamedAndBrightestFirst();
-
-    _renderer = new StarRenderer(_gl);
-    _renderer.LoadCatalog(_catalog);
-
-    _uiManager = new UIManager(_gl, _window, _inputContext);
-    _uiManager.OnFlyToRequested += star =>
+    private static void OnLoad()
     {
-        _camera.FlyTo(star.Position);
-    };
+        _gl = _window.CreateOpenGL();
+        _inputContext = _window.CreateInput();
 
-    if (_inputContext.Mice.Count > 0)
-    {
-        var mouse = _inputContext.Mice[0];
-        mouse.MouseMove += OnMouseMove;
-        mouse.Scroll += OnMouseScroll;
-        mouse.Click += OnMouseClick;
+        _gl.Enable(EnableCap.ProgramPointSize);
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        _camera.AspectRatio = (float)_window.Size.X / _window.Size.Y;
+
+        // Load full HYG catalog and sort brightest/named stars to top
+        string csvPath = Path.Combine(AppContext.BaseDirectory, "Assets", "hygdata_v42.csv.gz");
+        _catalog = CsvStarLoader.LoadFromFile(csvPath);
+        _catalog.SortNamedAndBrightestFirst();
+
+        _renderer = new StarRenderer(_gl);
+        _renderer.LoadCatalog(_catalog);
+
+        _uiManager = new UIManager(_gl, _window, _inputContext);
+        _uiManager.OnFlyToRequested += star =>
+        {
+            _camera.FlyTo(star.Position);
+        };
+
+        if (_inputContext.Mice.Count > 0)
+        {
+            var mouse = _inputContext.Mice[0];
+            mouse.MouseMove += OnMouseMove;
+            mouse.Scroll += OnMouseScroll;
+            mouse.Click += OnMouseClick;
+        }
     }
-}
     private static void OnMouseClick(IMouse mouse, MouseButton button, Vector2 position)
     {
         // Ignore clicks if ImGui is capturing input (e.g. clicking buttons on sidebar)
@@ -108,7 +110,7 @@ private static void OnLoad()
             _camera.ProcessMouseRotation(delta.X, delta.Y);
         }
         // Middle Mouse Drag OR Shift + Right Drag: Pan camera (XY plane)
-        else if (mouse.IsButtonPressed(MouseButton.Middle) || 
+        else if (mouse.IsButtonPressed(MouseButton.Middle) ||
                 (mouse.IsButtonPressed(MouseButton.Right) && _inputContext.Keyboards[0].IsKeyPressed(Key.ShiftLeft)))
         {
             _camera.ProcessMousePan(delta.X, delta.Y);

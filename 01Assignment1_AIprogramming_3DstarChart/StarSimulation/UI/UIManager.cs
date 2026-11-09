@@ -14,7 +14,25 @@ public class UIManager : IDisposable
 {
     private readonly ImGuiController _imGuiController;
     private string _searchFilter = "";
-    private bool _properNamedOnly = true; // Enabled by default to hide raw ID numbers
+    private bool _properNamedOnly = true;
+
+    // Sorting state
+    private int _selectedSortIndex = 0;
+    private int _lastSortIndex = -1;
+    private bool _lastProperNamedOnly = true;
+
+    private readonly string[] _sortOptions = new string[]
+    {
+        "Size (Largest First)",
+        "Size (Smallest First)",
+        "Brightness (Brightest First)",
+        "Brightness (Dimmest First)",
+        "Distance (Nearest First)",
+        "Distance (Farthest First)",
+        "Temperature (Hottest First)",
+        "Temperature (Coolest First)",
+        "Name (A - Z)"
+    };
 
     public Star? SelectedStar { get; private set; }
     public event Action<Star>? OnFlyToRequested;
@@ -36,11 +54,44 @@ public class UIManager : IDisposable
 
     public void Render(StarCatalog catalog, Camera camera, Vector2D<int> windowSize)
     {
+        if (_selectedSortIndex != _lastSortIndex || _properNamedOnly != _lastProperNamedOnly)
+        {
+            ApplySort(catalog);
+            _lastSortIndex = _selectedSortIndex;
+            _lastProperNamedOnly = _properNamedOnly;
+        }
+
         RenderWorldOverlays(catalog, camera, windowSize);
         RenderSidebar(catalog);
         RenderInspectionPanel(windowSize);
 
         _imGuiController.Render();
+    }
+
+    private void ApplySort(StarCatalog catalog)
+    {
+        catalog.Stars.Sort((a, b) =>
+        {
+            if (_properNamedOnly)
+            {
+                if (a.HasProperName && !b.HasProperName) return -1;
+                if (!a.HasProperName && b.HasProperName) return 1;
+            }
+
+            return _selectedSortIndex switch
+            {
+                0 => b.SolarDiameter.CompareTo(a.SolarDiameter),
+                1 => a.SolarDiameter.CompareTo(b.SolarDiameter),
+                2 => a.Magnitude.CompareTo(b.Magnitude),
+                3 => b.Magnitude.CompareTo(a.Magnitude),
+                4 => a.Position.LengthSquared().CompareTo(b.Position.LengthSquared()),
+                5 => b.Position.LengthSquared().CompareTo(a.Position.LengthSquared()),
+                6 => b.Temperature.CompareTo(a.Temperature),
+                7 => a.Temperature.CompareTo(b.Temperature),
+                8 => string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase),
+                _ => 0
+            };
+        });
     }
 
     private void RenderWorldOverlays(StarCatalog catalog, Camera camera, Vector2D<int> windowSize)
@@ -96,15 +147,19 @@ public class UIManager : IDisposable
     private void RenderSidebar(StarCatalog catalog)
     {
         ImGui.SetNextWindowPos(new Vector2(10, 10), ImGuiCond.FirstUseEver);
-        ImGui.SetNextWindowSize(new Vector2(280, 480), ImGuiCond.FirstUseEver);
+        ImGui.SetNextWindowSize(new Vector2(320, 520), ImGuiCond.FirstUseEver);
 
         if (ImGui.Begin("Star Catalog", ImGuiWindowFlags.None))
         {
-            ImGui.Text($"Catalog Count: {catalog.Stars.Count}");
+            ImGui.TextColored(new Vector4(0.7f, 0.9f, 1.0f, 1.0f), $"Total Loaded: {catalog.Stars.Count:N0} stars");
+            ImGui.Spacing();
+
             ImGui.InputText("Search", ref _searchFilter, 64);
-            
-            // Toggle for proper named stars vs all stars
             ImGui.Checkbox("Proper Named Only", ref _properNamedOnly);
+
+            ImGui.SetNextItemWidth(-1);
+            ImGui.Combo("##SortCombo", ref _selectedSortIndex, _sortOptions, _sortOptions.Length);
+
             ImGui.Separator();
 
             if (ImGui.BeginChild("StarListScroll"))
@@ -114,13 +169,9 @@ public class UIManager : IDisposable
 
                 foreach (var star in catalog.Stars)
                 {
-                    // Filter 1: Proper Named Only toggle
                     if (_properNamedOnly && !star.HasProperName) continue;
-
-                    // Filter 2: Hide raw Star #ID entries when proper named toggle is off
                     if (!_properNamedOnly && !star.HasProperName && !star.HasDesignation) continue;
 
-                    // Filter 3: Search string match
                     if (!string.IsNullOrWhiteSpace(_searchFilter) &&
                         !star.DisplayName.Contains(_searchFilter, StringComparison.OrdinalIgnoreCase))
                     {
@@ -128,7 +179,18 @@ public class UIManager : IDisposable
                     }
 
                     bool isSelected = (SelectedStar == star);
-                    if (ImGui.Selectable(star.DisplayName, isSelected))
+
+                    // Uses GetFormattedDiameterKm() or GetFormattedSolarDiameter() depending on sort
+                    string itemLabel = _selectedSortIndex switch
+                    {
+                        0 or 1 => $"{star.DisplayName} ({star.GetFormattedDiameterKm()})",
+                        2 or 3 => $"{star.DisplayName} (Mag {star.Magnitude:F1})",
+                        4 or 5 => $"{star.DisplayName} ({star.Position.Length():F1} ly)",
+                        6 or 7 => $"{star.DisplayName} ({star.Temperature:N0} K)",
+                        _ => star.DisplayName
+                    };
+
+                    if (ImGui.Selectable(itemLabel, isSelected))
                     {
                         SelectedStar = star;
                         OnFlyToRequested?.Invoke(star);
@@ -148,8 +210,8 @@ public class UIManager : IDisposable
     {
         if (SelectedStar == null) return;
 
-        float panelWidth = 450;
-        float panelHeight = 160;
+        float panelWidth = 500;
+        float panelHeight = 180;
         float posX = (windowSize.X - panelWidth) / 2.0f;
         float posY = windowSize.Y - panelHeight - 15;
 
@@ -161,21 +223,29 @@ public class UIManager : IDisposable
         if (ImGui.Begin("Star Inspector", flags))
         {
             ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), SelectedStar.DisplayName);
+            if (SelectedStar.HasDesignation && SelectedStar.HasProperName)
+            {
+                ImGui.SameLine();
+                ImGui.TextDisabled($"({SelectedStar.Designation})");
+            }
             ImGui.Separator();
 
             ImGui.Columns(2, "InspectorColumns", false);
 
-            ImGui.Text("Coordinates:");
+            float distFromSol = SelectedStar.Position.Length();
+            ImGui.Text("Coordinates (3D):");
             ImGui.Text($"X: {SelectedStar.Position.X:F2} ly");
             ImGui.Text($"Y: {SelectedStar.Position.Y:F2} ly");
             ImGui.Text($"Z: {SelectedStar.Position.Z:F2} ly");
+            ImGui.Text($"Dist to Sol: {distFromSol:N1} ly");
 
             ImGui.NextColumn();
 
-            ImGui.Text($"Temp: {SelectedStar.Temperature:F0} K");
-            ImGui.Text($"Solar Dimameter: {SelectedStar.GetDiameterKm():F2} Km");
-            ImGui.Text($"Mag:  {SelectedStar.Magnitude:F2}");
-            ImGui.Text($"Lum:  {SelectedStar.Luminosity:F2} Sol");
+            ImGui.Text("Physical Properties:");
+            ImGui.Text($"Temp:     {SelectedStar.Temperature:N0} K");
+            ImGui.Text($"Diameter: {SelectedStar.GetFormattedSolarDiameter()} ({SelectedStar.GetFormattedDiameterKm()})");
+            ImGui.Text($"Mag:      {SelectedStar.Magnitude:F2}");
+            ImGui.Text($"Lum:      {SelectedStar.Luminosity:N1} Sol");
 
             ImGui.Columns(1);
             ImGui.Spacing();

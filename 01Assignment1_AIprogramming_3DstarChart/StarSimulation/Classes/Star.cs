@@ -19,8 +19,8 @@ public class Star
     public bool HasProperName => !string.IsNullOrWhiteSpace(ProperName);
     public bool HasDesignation => !string.IsNullOrWhiteSpace(Designation);
 
-    public string DisplayName => HasProperName 
-        ? ProperName! 
+    public string DisplayName => HasProperName
+        ? ProperName!
         : (HasDesignation ? Designation! : $"Star #{Id}");
 
     /// <summary>
@@ -31,11 +31,10 @@ public class Star
         if (Temperature <= 0.0f) return 1.0f;
 
         const float solarTemp = 5778.0f; // Sun surface temp in Kelvin
-        
+
         // R / R_sun = sqrt(L / L_sun) * (T_sun / T)^2
         float radiusRatio = MathF.Sqrt(Luminosity) * MathF.Pow(solarTemp / Temperature, 2.0f);
 
-        // Diameter Ratio = 2 * Radius Ratio (normalized to Sun = 1.0)
         return radiusRatio;
     }
 
@@ -46,6 +45,42 @@ public class Star
     {
         const double solarDiameterKm = 1_392_700.0; // Sun diameter in km
         return GetSolarDiameter() * solarDiameterKm;
+    }
+
+    /// <summary>
+    /// Formats the star's physical diameter in kilometers with human-readable suffixes (Million, Billion, etc.).
+    /// </summary>
+    public string GetFormattedDiameterKm()
+    {
+        double km = GetDiameterKm();
+
+        if (km >= 1_000_000_000_000.0)
+            return $"{km / 1_000_000_000_000.0:F2} Trillion km";
+        if (km >= 1_000_000_000.0)
+            return $"{km / 1_000_000_000.0:F2} Billion km";
+        if (km >= 1_000_000.0)
+            return $"{km / 1_000_000.0:F2} Million km";
+        if (km >= 1_000.0)
+            return $"{km:N0} km";
+
+        return $"{km:F0} km";
+    }
+
+    /// <summary>
+    /// Formats the star's diameter relative to the Sun (e.g. "1.00 R⊙" or "1,200 R⊙").
+    /// </summary>
+    public string GetFormattedSolarDiameter()
+    {
+        float d = SolarDiameter;
+
+        if (d >= 1000.0f)
+            return $"{d:N0} R⊙";
+        if (d >= 10.0f)
+            return $"{d:F1} R⊙";
+        if (d >= 0.01f)
+            return $"{d:F2} R⊙";
+
+        return $"{d:F4} R⊙";
     }
 
     public Vector3 GetRGBColor()
