@@ -31,6 +31,112 @@ You must explain your code in your demo or you will be asked to do it again/a li
 
 Edit the YouTube Link above, the part in the square brackets is the text you see and doesn't need to change. Put the url of your demo inside the round brackets and check it clicks through to your demo.
 
+### Data Layer Class Structure
+
+The core data architecture (`namespace StarChart`) separates astronomical entity modeling, collection management, and file ingestion into three cohesive classes.
+
+#### Class Relationships
+
+```mermaid
+classDiagram
+    class CsvStarLoader {
+        <<static>>
+        +LoadFromFile(string filePath) StarCatalog$
+        -SplitAndCleanCsvLine(string line) string[]$
+        -ConvertSphericalToCartesian(float raHours, float decDegrees, float distance) Vector3$
+        -ParseFloat(string value, out float result) bool$
+    }
+
+    class StarCatalog {
+        +List~Star~ Stars
+        +AddStar(Star star) void
+        +SortNamedAndBrightestFirst() void
+        +FindNearestStar(Star target) Star?
+    }
+
+    class Star {
+        +int Id
+        +string? ProperName
+        +string? Designation
+        +Vector3 Position
+        +float Magnitude
+        +float Temperature
+        +float Luminosity
+        +float SolarDiameter
+        +bool HasProperName
+        +bool HasDesignation
+        +string DisplayName
+        +GetSolarDiameter() float
+        +GetDiameterKm() double
+        +GetFormattedDiameterKm() string
+        +GetFormattedSolarDiameter() string
+        +GetRGBColor() Vector3
+    }
+
+    CsvStarLoader ..> StarCatalog : instantiates & populates
+    CsvStarLoader ..> Star : parses & constructs
+    StarCatalog "1" o-- "0..*" Star : stores
+```
+
+---
+
+### 1. `Star`
+Represents an individual astronomical body and encapsulates physical derivations (Stefan-Boltzmann scaling, blackbody colour temperature) and UI display formatting.
+
+#### Properties
+| Member | Type | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `Id` | `int` | `get; set;` | Unique catalog identifier from the HYG dataset (`0` = Sol). |
+| `ProperName` | `string?` | `get; set;` | Common human name (e.g., *Sirius*, *Betelgeuse*), if cataloged. |
+| `Designation` | `string?` | `get; set;` | Fallback astronomical identifier (Bayer/Flamsteed, Gliese, HR, HD, or HIP). |
+| `Position` | `Vector3` | `get; set;` | Heliocentric 3D Cartesian coordinates in light-years/parsecs. |
+| `Magnitude` | `float` | `get; set;` | Apparent visual magnitude (`mag`). |
+| `Temperature` | `float` | `get; set;` | Effective surface temperature in Kelvin (`1,000 K` – `40,000 K`). |
+| `Luminosity` | `float` | `get; set;` | Bolometric luminosity relative to the Sun ($L / L_\odot$). |
+| `SolarDiameter` | `float` | `get;` | Computed diameter ratio relative to Sol ($1.0\text{ R}_\odot$). |
+| `HasProperName` | `bool` | `get;` | `true` if `ProperName` is non-empty. |
+| `HasDesignation` | `bool` | `get;` | `true` if `Designation` is non-empty. |
+| `DisplayName` | `string` | `get;` | Resolves display priority: `ProperName` $\rightarrow$ `Designation` $\rightarrow$ `Star #{Id}`. |
+
+#### Methods
+| Signature | Return Type | Description |
+| :--- | :--- | :--- |
+| `GetSolarDiameter()` | `float` | Computes stellar radius/diameter ratio relative to Sol ($T_\odot = 5778\text{ K}$) via $\sqrt{L/L_\odot} \cdot (T_\odot / T)^2$. |
+| `GetDiameterKm()` | `double` | Converts `SolarDiameter` to absolute kilometres ($1\text{ R}_\odot = 1,392,700\text{ km}$). |
+| `GetFormattedDiameterKm()` | `string` | Formats kilometre diameter with readable scale suffixes (`km`, `Million km`, `Billion km`, `Trillion km`). |
+| `GetFormattedSolarDiameter()` | `string` | Formats relative solar size with adaptive decimal precision (`R⊙`). |
+| `GetRGBColor()` | `Vector3` | Approximates normalized RGB colour (`0.0`–`1.0`) from `Temperature` using Tanner Helland's blackbody algorithm. |
+
+---
+
+### 2. `StarCatalog`
+Manages the in-memory collection of loaded `Star` instances and provides sorting and spatial query operations.
+
+#### Properties
+| Member | Type | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `Stars` | `List<Star>` | `get;` | Backing list containing all valid stars parsed from the dataset. |
+
+#### Methods
+| Signature | Return Type | Description |
+| :--- | :--- | :--- |
+| `AddStar(Star star)` | `void` | Appends a parsed `Star` instance to the catalog. |
+| `SortNamedAndBrightestFirst()` | `void` | Orders stars with proper human names first, sorting ties and remaining stars by ascending apparent magnitude. |
+| `FindNearestStar(Star target)` | `Star?` | Performs a linear squared-distance search (`Vector3.DistanceSquared`) to locate the closest neighbour to `target`. |
+
+---
+
+### 3. `CsvStarLoader` (`static`)
+Handles file resolution, transparent GZip decompression, CSV sanitization, and coordinate/astrophysical parsing for the HYG catalog.
+
+#### Methods
+| Signature | Visibility | Description |
+| :--- | :--- | :--- |
+| `LoadFromFile(string filePath)` | `public` | Resolves `filePath` (checking working directory, base directory, and `Assets/`), streams plain `.csv` or `.csv.gz` data, maps dynamic column headers, and returns a populated `StarCatalog`. |
+| `SplitAndCleanCsvLine(string line)` | `private` | Splits comma-delimited rows and strips outer quotes, whitespace, newlines, and UTF-8 BOM (`\uFEFF`) characters. |
+| `ConvertSphericalToCartesian(...)` | `private` | Fallback converter transforming Right Ascension (`ra` in hours), Declination (`dec` in degrees), and `dist` into 3D `Vector3` coordinates. |
+| `ParseFloat(string value, out float result)` | `private` | Culture-invariant (`CultureInfo.InvariantCulture`) floating-point parser. |
+
 ## Assignment 2: BOOSE Programming Language interpreter
 See the assignment spec for details. You are expected to implement an interpreter for the BOOSE programming language. The interpreter should be able to parse and execute BOOSE code, handling various constructs such as variables, loops, conditionals, and functions.
 
