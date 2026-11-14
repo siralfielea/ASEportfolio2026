@@ -30,6 +30,8 @@ See the assignment spec for details. You are expected to implement a 3D star cha
 You must explain your code in your demo or you will be asked to do it again/a live demo.
 
 Edit the YouTube Link above, the part in the square brackets is the text you see and doesn't need to change. Put the url of your demo inside the round brackets and check it clicks through to your demo.
+### Ai Approach
+This project was developed using an iterative, human-in-the-loop AI-assisted software engineering workflow. Rather than relying on monolithic code generation, the architecture was decomposed into decoupled modules—data ingestion (CsvStarLoader), astrophysical modeling (Star, StarCatalog), GPU rendering (StarRenderer and Shader), camera navigation (Camera), and interface controls (UIManager). Generative AI was utilised as a collaborative pair-programming tool to accelerate boilerplate scaffolding, GLSL shader prototyping, and UI layout iteration, while all core mathematical models (such as Stefan-Boltzmann stellar radius scaling and Ballesteros' temperature approximations), OpenGL state management, and architectural boundaries were manually verified, debugged, and incrementally integrated to maintain codebase stability.
 
 ### Data Layer Class Structure
 
